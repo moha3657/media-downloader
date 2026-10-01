@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Downloader Hub</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+        .main-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 580px;
+        }
+        .form-control, .form-select {
+            background-color: #0f172a;
+            border: 1px solid #475569;
+            color: #fff;
+            border-radius: 12px;
+            padding: 12px 16px;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #0f172a;
+            border-color: #6366f1;
+            color: #fff;
+            box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.25);
+        }
+        .btn-custom {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            border: none;
+            border-radius: 12px;
+            padding: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #fff;
+            transition: all 0.3s ease;
+        }
+        .btn-custom:hover {
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
+            transform: translateY(-2px);
+        }
+        .thumbnail-img {
+            width: 100%;
+            border-radius: 12px;
+            max-height: 220px;
+            object-fit: cover;
+            margin-bottom: 15px;
+        }
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-card">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold"><i class="fa-solid fa-cloud-arrow-down text-indigo me-2"></i>Media Downloader</h2>
+        <p class="text-secondary fs-6">Download YouTube Videos & Shorts in high resolution</p>
+    </div>
+
+    <!-- Form 1: Fetch Video Info -->
+    <form id="urlForm">
+        <div class="mb-3">
+            <label class="form-label text-slate-300">Video or Shorts URL</label>
+            <div class="input-group">
+                <input type="url" id="videoUrl" class="form-control" placeholder="https://www.youtube.com/watch?v=..." required>
+                <button type="submit" class="btn btn-custom px-4" id="fetchBtn">
+                    <span id="fetchText">Fetch</span>
+                    <span id="fetchSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Form 2: Select Resolution & Download -->
+    <div id="resultArea" class="mt-4" style="display: none;">
+        <hr class="border-secondary my-4">
+        <img id="videoThumbnail" class="thumbnail-img" src="" alt="Thumbnail">
+        <h6 id="videoTitle" class="fw-semibold mb-3 text-truncate"></h6>
+
+        <form id="downloadForm" action="/download" method="POST">
+            <input type="hidden" name="url" id="hiddenUrl">
+            <div class="mb-3">
+                <label class="form-label">Choose Quality / Format</label>
+                <select name="quality" id="qualitySelect" class="form-select" required></select>
+            </div>
+            <button type="submit" id="downloadBtn" class="btn btn-success w-100 btn-custom py-2 mt-2">
+                <i class="fa-solid fa-download me-2"></i>Download File
+            </button>
+        </form>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="statusMessage" class="mt-3 text-center fs-6 text-info"></div>
+</div>
+
+<script>
+    const urlForm = document.getElementById('urlForm');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const fetchText = document.getElementById('fetchText');
+    const fetchSpinner = document.getElementById('fetchSpinner');
+    const resultArea = document.getElementById('resultArea');
+    const qualitySelect = document.getElementById('qualitySelect');
+    const statusMessage = document.getElementById('statusMessage');
+
+    urlForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const url = document.getElementById('videoUrl').value.trim();
+        if (!url) return;
+
+        // UI Loading State
+        fetchText.innerText = 'Analyzing...';
+        fetchSpinner.classList.remove('d-none');
+        fetchBtn.disabled = true;
+        statusMessage.innerText = '';
+        resultArea.style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('url', url);
+
+        try {
+            const response = await fetch('/get-formats', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                document.getElementById('videoTitle').innerText = data.title;
+                document.getElementById('videoThumbnail').src = data.thumbnail;
+                document.getElementById('hiddenUrl').value = url;
+
+                qualitySelect.innerHTML = '';
+                
+                // Add MP4 resolutions
+                data.resolutions.forEach(res => {
+                    qualitySelect.innerHTML += `<option value="${res}">Video MP4 - ${res}p</option>`;
+                });
+                
+                // Add Audio MP3
+                qualitySelect.innerHTML += `<option value="mp3">Audio Only - MP3 (High Quality)</option>`;
+
+                resultArea.style.display = 'block';
+            } else {
+                statusMessage.className = 'mt-3 text-center fs-6 text-danger';
+                statusMessage.innerText = 'Error: Unable to fetch video details. Please check the URL.';
+            }
+        } catch (err) {
+            statusMessage.className = 'mt-3 text-center fs-6 text-danger';
+            statusMessage.innerText = 'Failed to connect to the server.';
+        } finally {
+            fetchText.innerText = 'Fetch';
+            fetchSpinner.classList.add('d-none');
+            fetchBtn.disabled = false;
+        }
+    });
+</script>
+
+</body>
+</html>
